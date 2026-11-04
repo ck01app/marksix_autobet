@@ -1,0 +1,173 @@
+# Project Handoff: HKJC Mark Six Auto-Bet Chrome Extension
+
+## 1. 專案背景與定位
+這是一個專為「香港賽馬會 (HKJC) 六合彩」網頁開發的 Chrome Extension (Manifest V3) 輔助工具。它的核心功能是讓使用者將從 Excel 複製出來、以 Tab (製表符) 分隔的號碼文字檔 (.txt / .csv) 直接上傳，並在馬會投注網頁上執行全自動的點擊選號與分批提交。項目定位為【完全開源 (Open-Source)】，以建立使用者的絕對隱私信任（所有數據 100% 在本地處理，絕不上傳伺服器）。
+
+## 2. 目前已實現的架構與功能
+項目已移除了獨立的 Popup 介面，改為全自動偵測馬會網域並直接在網頁畫面上注入懸浮控制盒（純 Content Script 注入，繞過了馬會嚴格的 CSP 安全政策與分頁通訊限制）。
+- **manifest.json**：配置了 `"https://bet.hkjc.com"` 與 `["https://bet.hkjc.com/ch/marksix/*","https://bet.hkjc.com/en/marksix/*"]` 的注入權限，設定為 `document_start` 與 `all_frames: true` 確保強制注入。
+- **content.js**：
+  - 自動在馬會網頁右上角畫出一個精美的懸浮綠色控制盒（UI）。
+  - 支援【滑鼠隨意拖拽移動 (Draggable)】功能，防止擋住投注區。
+  - 右上角自帶紅色的【「×」手動關閉/銷毀按鈕】。
+  - 使用【萬能空白分割法】精準解析 Excel 複製出來的 Tab 分隔數據，過濾 1-49 有效號碼。
+  - 完美沿用經測試完全正確的 Python Selenium 行列算式 XPath。
+  - 具備防呆機制：每 60 個號碼（10注）或最後一注，會自動觸發分批提交序列（添加到投注區 -> 發送注項 -> 確定投注），並在每次點擊與提交間設有非同步延遲（sleep/waitForElement）。
+  - 增加了針對 `e.target.files` 取消選取時的類型防禦（避免 Blob 報錯）。
+
+---
+
+## 3. 核心原始碼回顧 (現行工作版本)
+
+### 【manifest.json】
+```json
+{
+  "manifest_version": 3,
+  "name": "MarkSix Autobet Helper 六合彩自動投注助手",
+  "version": "1.7",
+  "description": "Full automatic filling marksix bets 全自動快速填寫六合彩注項",
+  "permissions": ["activeTab", "scripting"],
+  "host_permissions": ["https://bet.hkjc.com"],
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://bet.hkjc.com/ch/marksix/*","https://bet.hkjc.com/en/marksix/*"],
+      "js": ["content.js"],
+      "run_at": "document_start",
+      "all_frames": true
+    }
+  ]
+}
+```
+
+### 【content.js】
+```javascript
+(function() {
+  'use strict';
+  function initHelper() {
+    if (!document.body || document.getElementById('helper-file-input')) return;
+    try {
+      const helperBox = document.createElement('div');
+      helperBox.id = 'hkjc-helper-box-container';
+      helperBox.style = "position:fixed;top:120px;right:20px;z-index:9999999;padding:15px;background:#fff;border:3px solid #28a745;border-radius:8px;box-shadow:0 4px 15px rgba(0,0,0,0.3);width:260px;font-family:Arial,sans-serif;transition:opacity 0.3s;cursor:move;";
+      helperBox.innerHTML = `
+        <button id="helper-close-btn" style="position:absolute;top:10px;right:10px;background:none;border:none;color:#dc3545;font-size:20px;font-weight:bold;cursor:pointer;padding:0 5px;line-height:1;z-index:10;">×</button>
+        <h4 id="helper-title" style="margin:0 0 10px 0;color:#333;font-size:16px;font-weight:bold;padding-right:20px;user-select:none;">六合彩自動投注快線</h4>
+        <p style="font-size:12px;color:#666;margin-bottom:10px;user-select:none;">請先手動登入馬會帳戶，然後選擇檔案。</p>
+        <input type="file" id="helper-file-input" accept=".csv,.txt" style="width:100%;margin-bottom:10px;cursor:default;" />
+        <button id="helper-start-btn" disabled style="width:100%;padding:8px;background:#28a745;color:white;border:none;border-radius:4px;cursor:pointer;font-weight:bold;font-size:14px;">開始自動選號</button>
+        <div id="helper-status" style="margin-top:10px;font-size:12px;font-weight:bold;color:#666;user-select:none;">等待上傳 Excel 複製的文字檔...</div>
+      `;
+      document.body.appendChild(helperBox);
+
+      const fileInput = document.getElementById('helper-file-input');
+      const startBtn = document.getElementById('helper-start-btn');
+      const statusDiv = document.getElementById('helper-status');
+      const closeBtn = document.getElementById('helper-close-btn');
+      let parsedNumbers = [];
+      const sleep = ms => new Promise(r => setTimeout(r, ms));
+      const waitForElement = (xp, t=10000) => new Promise((res,rej)=>{
+        const start = Date.now();
+        const timer = setInterval(()=>{
+          const el = document.evaluate(xp, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+          if(el) { clearInterval(timer); res(el); }
+          else if(Date.now()-start>t) { clearInterval(timer); rej(new Error('Timeout')); }
+        },200);
+      });
+
+      // 拖拽邏輯
+      let isDragging = false, offsetX = 0, offsetY = 0;
+      helperBox.addEventListener('mousedown', (e) => {
+        if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
+        isDragging = true; offsetX = e.clientX - helperBox.offsetLeft; offsetY = e.clientY - helperBox.offsetTop;
+        helperBox.style.transition = "none";
+      });
+      document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        helperBox.style.right = 'auto'; helperBox.style.left = (e.clientX - offsetX) + 'px'; helperBox.style.top = (e.clientY - offsetY) + 'px';
+      });
+      document.addEventListener('mouseup', () => { isDragging = false; helperBox.style.transition = "opacity 0.3s"; });
+      closeBtn.addEventListener('click', () => { helperBox.style.opacity = "0"; setTimeout(() => helperBox.remove(), 300); });
+
+      // 檔案讀取
+      fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0]; if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+          parsedNumbers = evt.target.result.split(/[\s,]+/).map(n => parseInt(n.trim(), 10)).filter(n => !isNaN(n) && n >= 1 && n <= 49);
+          if (parsedNumbers.length > 0) {
+            statusDiv.style.color = '#28a745'; statusDiv.innerText = `成功載入 ${parsedNumbers.length} 個號碼 (${Math.ceil(parsedNumbers.length / 6)} 注)`;
+            startBtn.disabled = false;
+          } else {
+            statusDiv.style.color = '#dc3545'; statusDiv.innerText = "無法解析號碼！"; startBtn.disabled = true;
+          }
+        };
+        reader.readAsText(file);
+      });
+
+      // 自動選號點擊邏輯
+      startBtn.addEventListener('click', async () => {
+        startBtn.disabled = true; fileInput.disabled = true; statusDiv.style.color = '#007bff';
+        for (let i = 0; i < parsedNumbers.length; i++) {
+          const n = parsedNumbers[i], row = Math.floor((n-1)/10)+1, col = ((n-1)%10)+1;
+          const ballXpath = `//*[@id="ball-panel-table"]/div[${row}]/div[${col}]/div`;
+          statusDiv.innerText = `正在點擊號碼: ${n} (${i+1}/${parsedNumbers.length})`;
+          try {
+            const ball = document.evaluate(ballXpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+            if (ball) ball.click();
+          } catch (e) {}
+
+          if (((i + 1) >= 60 && (i + 1) % 60 === 0) || (i + 1) === parsedNumbers.length) {
+            try {
+              statusDiv.innerText = "正在處理：添加到投注區...";
+              (await waitForElement('//*[@id="Add_to_Slip"]')).click(); await sleep(1000);
+              statusDiv.innerText = "正在處理：發送注項...";
+              (await waitForElement('//*[@data-testid="bet_placeBet_button"]')).click(); await sleep(2000);
+              statusDiv.innerText = "正在處理：確定投注...";
+              (await waitForElement('//button[starts-with(text(), "確定")]')).click(); await sleep(2000);
+            } catch (err) {
+              statusDiv.style.color = '#dc3545'; statusDiv.innerText = "自動化流程中斷，請檢查網頁狀態。"; break;
+            }
+          }
+          await sleep(150);
+        }
+        statusDiv.style.color = '#28a745'; statusDiv.innerText = "所有注項已全數自動化投注完畢！";
+        startBtn.disabled = false; fileInput.disabled = false;
+      });
+    } catch (err) {}
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", initHelper); else initHelper();
+})();
+```
+
+---
+
+## 4. 接下來待完成的優化任務 (Outstanding Tasks)
+
+請基於上述現有的工作版本代碼，**逐步引導我完成以下優化任務**。我們現在先從【任務 1：多語言支持（Multi-language）】開始著手：
+
+### 🌐 任務 1：多語言支持 (Multi-language - HK, CN, EN)
+- 自動偵測馬會網頁當前的語系（透過判斷 URL 是包含 `/ch/` 還是 `/en/`）。
+- 控制盒內的所有 UI 文字（標題、提示、按鈕、狀態字樣）需根據語系自動切換為：繁體中文 (香港)、簡體中文 (內地)、以及英文 (EN)。
+
+### 🛡️ 任務 2：更強大的錯誤處理與重新啟動程序 (Error Handling & Restart)
+- 如果遇到馬會網頁逾時、資金不足或某個按鈕（如「確定」）點擊超時，腳本不能直接死當。
+- 需要加入防呆重試機制，並在控制盒上即時更新錯誤提示。
+- 提供一個【重置/重新啟動 (Reset/Restart)】按鈕，讓使用者不用重新整理整個網頁就能清空狀態、重新上傳新檔案進行第二次投注。
+
+### 📦 任務 3：準備發佈至 Chrome 線上應用程式商店 (Chrome Store Publication)
+- 協助優化 `manifest.json`，精確縮減 `host_permissions` 權限範圍以加快 Google 的自動化審查。
+- 撰寫應對 Google 商店審查時所需的官方英文「單一用途說明 (Single Purpose)」、「權限合理性原因 (Justification)」以及「本地隱私實務聲明 (Privacy Practices)」。
+- 整理在 GitHub 上發佈開源發行版「一鍵安裝 ZIP 包 (Release)」的標準打包流程。
+
+### 📄 任務 4：完善開源文檔與使用指南 (Documentation)
+- 撰寫包含中英文對照的 `README.md` 開源專案說明書。
+- 提供一份標準格式的 Excel / CSV 測試範例數據，供使用者下載或複製進行首航測試。
+
+---
+
+**請回覆我：你已完全理解本項目的現狀與代碼結構。讓我們立刻開始【任務 1：多語言支持】的代碼重構，請為我編寫最新的 `content.js` 實現方式！**
