@@ -21,6 +21,15 @@ An open-source Chrome Extension (Manifest V3) that automates ball selection and 
 
 ---
 
+### 📱 推薦搭配手機 App：智運贏六合彩 (MarkSix AI&Luck)
+
+想要更智慧地生成號碼並一鍵導出 CSV？歡迎下載我們的同款手機 App！支援 AI 智慧選號與運勢預測，並可直接將結果導出為 CSV 檔，搭配本 Chrome 助手實現極速自動投注：
+
+* 🍏 **iOS 版本 (App Store)**：[MarkSix AI&Luck 智運贏六合彩](https://apps.apple.com/us/app/marksix-ai-luck/id6788589296)
+* 🤖 **Android 版本 (Google Play)**：[MarkSix AI&Luck 智運贏六合彩](https://play.google.com/store/apps/details?id=com.ck01app.zyymarksix)
+
+---
+
 ### 🚀 安裝方式
 
 #### 方式 1：自 Chrome 線上應用程式商店安裝 (推薦)
@@ -39,7 +48,7 @@ An open-source Chrome Extension (Manifest V3) that automates ball selection and 
 1. 開啟馬會六合彩官方投注網頁 (`https://bet.hkjc.com/ch/marksix/`)。
 2. 手動登入您的馬會投注帳戶。
 3. 網頁右上角會自動載入綠色的「六合彩自動投注助手」懸浮控制盒。
-4. 點擊 **「選擇檔案」**，上傳準備好的 `.csv` 或 `.txt` 號碼檔。
+4. 點擊 **「選擇檔案」**，上傳由 **智運贏六合彩 App** 或 Excel 匯出的 `.csv` / `.txt` 號碼檔。
 5. 確認顯示載入的號碼與注數無誤後，點擊 **「開始自動選號」**。
 
 ---
@@ -58,6 +67,15 @@ An open-source Chrome Extension (Manifest V3) that automates ball selection and 
 * **Bilingual UI**: Automatically matches the HKJC site language (Traditional Chinese / English).
 * **Draggable Interface**: Floating overlay widget can be dragged anywhere on screen.
 * **Error Handling & Reset**: Real-time progress updates with timeout defenses and a one-click **Reset / Restart** button.
+
+---
+
+### 📱 Mobile App Recommendation: MarkSix AI&Luck
+
+Generate smart bets on the go! Use our companion mobile app **MarkSix AI&Luck** to analyze numbers and export bet predictions directly into CSV files for seamless auto-betting with this desktop extension:
+
+* 🍏 **iOS (App Store)**: [MarkSix AI&Luck](https://apps.apple.com/us/app/marksix-ai-luck/id6788589296)
+* 🤖 **Android (Google Play)**: [MarkSix AI&Luck](https://play.google.com/store/apps/details?id=com.ck01app.zyymarksix)
 
 ---
 
