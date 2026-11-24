@@ -32,11 +32,7 @@ An open-source Chrome Extension (Manifest V3) that automates ball selection and 
 
 ### 🚀 安裝方式
 
-#### 方式 1：自 Chrome 線上應用程式商店安裝 (推薦)
-1. 前往 [Chrome Web Store](https://chromewebstore.google.com) 搜尋 **「MarkSix Auto-Bet Helper」**。
-2. 點擊 **「加到 Chrome」** 即可完成安裝。
-
-#### 方式 2：下載 GitHub Release 封裝檔
+#### 下載 GitHub Release 封裝檔
 1. 在本 GitHub 專案右側欄位的 **Releases** 下載最新版的 `marksix-autobet-vX.X.zip` 檔並解壓縮。
 2. 開啟 Chrome 瀏覽器，前往 `chrome://extensions/`。
 3. 開啟右上角的 **「開發人員模式 (Developer mode)」**。
@@ -81,11 +77,7 @@ Generate smart bets on the go! Use our companion mobile app **MarkSix AI&Luck** 
 
 ### 🚀 Installation
 
-#### Method 1: Chrome Web Store (Recommended)
-1. Search for **"MarkSix Auto-Bet Helper"** on the [Chrome Web Store](https://chromewebstore.google.com).
-2. Click **"Add to Chrome"**.
-
-#### Method 2: Manual Installation via Release ZIP
+#### Manual Installation via Release ZIP
 1. Download the latest `marksix-autobet-vX.X.zip` from the **Releases** section on GitHub and unzip it.
 2. Open Chrome and navigate to `chrome://extensions/`.
 3. Enable **"Developer mode"** in the top right corner.
