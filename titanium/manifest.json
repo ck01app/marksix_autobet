@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "MarkSix Auto-Bet Helper (Titanium Mobile)",
+  "version": "1.0",
+  "description": "Mobile Titanium Browser version for HKJC Mark Six auto-betting",
+  "permissions": ["activeTab", "scripting"],
+  "host_permissions": [
+    "https://bet.hkjc.com/*"
+  ],
+  "action": {
+    "default_title": "MarkSix Mobile Helper"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  }
+}
