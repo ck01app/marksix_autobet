@@ -1,21 +1,21 @@
 {
   "manifest_version": 3,
-  "name": "MarkSix Autobet Helper 六合彩自動投注助手",
-  "version": "1.8",
+  "name": "MarkSix Auto-Bet Helper 六合彩自動投注助手",
+  "version": "1.9",
   "description": "Full automatic filling marksix bets 全自動快速填寫六合彩注項",
-  "permissions": ["activeTab"],
-  "host_permissions": ["https://bet.hkjc.com"],
+  "permissions": ["activeTab", "scripting"],
+  "host_permissions": [
+    "https://bet.hkjc.com/*"
+  ],
+  "action": {
+    "default_title": "MarkSix Auto-Bet Helper"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
   "icons": {
     "16": "icon16.png",
     "48": "icon48.png",
     "128": "icon128.png"
-  },
-  "content_scripts": [
-    {
-      "matches": ["https://bet.hkjc.com/ch/marksix/*","https://bet.hkjc.com/en/marksix/*"],
-      "js": ["content.js"],
-      "run_at": "document_start",
-      "all_frames": true
-    }
-  ]
+  }
 }

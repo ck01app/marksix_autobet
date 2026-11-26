@@ -1,7 +1,12 @@
 (function() {
   'use strict';
 
-  // 1. 雙語字典檔設定 (保留你的最新標籤與錯誤提示擴充)
+  // Prevent duplicate listener/helper setup on repeated icon clicks
+  if (typeof window.__toggleMarkSixHelper === 'function') {
+    return;
+  }
+
+  // 1. 雙語字典檔設定
   const i18n = {
     'zh-HK': {
       title: '六合彩自動投注助手',
@@ -45,19 +50,18 @@
   function detectLang() {
     const path = window.location.pathname;
     if (path.includes('/en/')) return 'en';
-    return 'zh-HK'; // 預設及 /ch/ 路徑均為繁體中文
+    return 'zh-HK';
   }
 
-  function initHelper() {
-    if (!document.body || document.getElementById('helper-file-input')) return;
-    
+  function createHelperBox() {
+    if (!document.body || document.getElementById('hkjc-helper-box-container')) return;
+
     const currentLang = detectLang();
     const t = i18n[currentLang];
 
     try {
       const helperBox = document.createElement('div');
       helperBox.id = 'hkjc-helper-box-container';
-      // 保留你自訂的初始位置 top:30px; right:360px
       helperBox.style = "position:fixed;top:30px;right:360px;z-index:9999999;padding:15px;background:#fff;border:3px solid #28a745;border-radius:8px;box-shadow:0 4px 15px rgba(0,0,0,0.3);width:260px;font-family:Arial,sans-serif;transition:opacity 0.3s;cursor:move;";
       helperBox.innerHTML = `
         <button id="helper-close-btn" style="position:absolute;top:10px;right:10px;background:none;border:none;color:#dc3545;font-size:20px;font-weight:bold;cursor:pointer;padding:0 5px;line-height:1;z-index:10;">×</button>
@@ -78,30 +82,38 @@
       let parsedNumbers = [];
 
       const sleep = ms => new Promise(r => setTimeout(r, ms));
-      
-      // 強化版 waitForElement：帶入標籤名稱，逾時即回傳具體錯誤
-      const waitForElement = (xp, labelName, t_ms=10000) => new Promise((res,rej)=>{
+
+      const waitForElement = (xp, labelName, t_ms = 10000) => new Promise((res, rej) => {
         const start = Date.now();
-        const timer = setInterval(()=>{
+        const timer = setInterval(() => {
           const el = document.evaluate(xp, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
-          if(el) { clearInterval(timer); res(el); }
-          else if(Date.now()-start>t_ms) { clearInterval(timer); rej(new Error(t.errorTimeout(labelName))); }
-        },200);
+          if (el) { clearInterval(timer); res(el); }
+          else if (Date.now() - start > t_ms) { clearInterval(timer); rej(new Error(t.errorTimeout(labelName))); }
+        }, 200);
       });
 
       // 拖拽邏輯
       let isDragging = false, offsetX = 0, offsetY = 0;
       helperBox.addEventListener('mousedown', (e) => {
         if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
-        isDragging = true; offsetX = e.clientX - helperBox.offsetLeft; offsetY = e.clientY - helperBox.offsetTop;
+        isDragging = true;
+        offsetX = e.clientX - helperBox.offsetLeft;
+        offsetY = e.clientY - helperBox.offsetTop;
         helperBox.style.transition = "none";
       });
       document.addEventListener('mousemove', (e) => {
         if (!isDragging) return;
-        helperBox.style.right = 'auto'; helperBox.style.left = (e.clientX - offsetX) + 'px'; helperBox.style.top = (e.clientY - offsetY) + 'px';
+        helperBox.style.right = 'auto';
+        helperBox.style.left = (e.clientX - offsetX) + 'px';
+        helperBox.style.top = (e.clientY - offsetY) + 'px';
       });
-      document.addEventListener('mouseup', () => { isDragging = false; helperBox.style.transition = "opacity 0.3s"; });
-      closeBtn.addEventListener('click', () => { helperBox.style.opacity = "0"; setTimeout(() => helperBox.remove(), 300); });
+      document.addEventListener('mouseup', () => {
+        isDragging = false;
+        helperBox.style.transition = "opacity 0.3s";
+      });
+      closeBtn.addEventListener('click', () => {
+        helperBox.style.display = "none";
+      });
 
       // 重置 / 重新啟動邏輯
       function resetHelperState() {
@@ -120,17 +132,22 @@
 
       // 檔案讀取
       fileInput.addEventListener('change', (e) => {
-        const file = e.target.files[0]; if (!file) return;
+        const file = e.target.files[0];
+        if (!file) return;
         const reader = new FileReader();
         reader.onload = function(evt) {
-          parsedNumbers = evt.target.result.split(/[\s,]+/).map(n => parseInt(n.trim(), 10)).filter(n => !isNaN(n) && n >= 1 && n <= 49);
+          parsedNumbers = evt.target.result
+            .split(/[\s,]+/)
+            .map(n => parseInt(n.trim(), 10))
+            .filter(n => !isNaN(n) && n >= 1 && n <= 49);
+
           if (parsedNumbers.length > 0) {
-            statusDiv.style.color = '#28a745'; 
+            statusDiv.style.color = '#28a745';
             statusDiv.innerText = t.statusLoaded(parsedNumbers.length, Math.ceil(parsedNumbers.length / 6));
             startBtn.disabled = false;
           } else {
-            statusDiv.style.color = '#dc3545'; 
-            statusDiv.innerText = t.statusParseError; 
+            statusDiv.style.color = '#dc3545';
+            statusDiv.innerText = t.statusParseError;
             startBtn.disabled = true;
           }
         };
@@ -139,48 +156,46 @@
 
       // 自動選號點擊與錯誤處理邏輯
       startBtn.addEventListener('click', async () => {
-        startBtn.disabled = true; 
-        fileInput.disabled = true; 
+        startBtn.disabled = true;
+        fileInput.disabled = true;
         statusDiv.style.color = '#007bff';
         startBtn.innerText = t.startBtnRunning;
 
         try {
           for (let i = 0; i < parsedNumbers.length; i++) {
-            const n = parsedNumbers[i], row = Math.floor((n-1)/10)+1, col = ((n-1)%10)+1;
+            const n = parsedNumbers[i];
+            const row = Math.floor((n - 1) / 10) + 1;
+            const col = ((n - 1) % 10) + 1;
             const ballXpath = `//*[@id="ball-panel-table"]/div[${row}]/div[${col}]/div`;
-            statusDiv.innerText = t.statusRunning(n, i+1, parsedNumbers.length);
-            
+            statusDiv.innerText = t.statusRunning(n, i + 1, parsedNumbers.length);
+
             try {
               const ball = document.evaluate(ballXpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
               if (ball) ball.click();
             } catch (e) {}
 
-            // 每 60 個號碼 (10注) 或最後一注時執行分批提交
             if (((i + 1) >= 60 && (i + 1) % 60 === 0) || (i + 1) === parsedNumbers.length) {
               statusDiv.innerText = t.stepAdd;
-              (await waitForElement('//*[@id="Add_to_Slip"]', 'Add_to_Slip')).click(); 
+              (await waitForElement('//*[@id="Add_to_Slip"]', 'Add_to_Slip')).click();
               await sleep(1000);
 
               statusDiv.innerText = t.stepPlace;
-              (await waitForElement('//*[@data-testid="bet_placeBet_button"]', 'bet_placeBet_button')).click(); 
+              (await waitForElement('//*[@data-testid="bet_placeBet_button"]', 'bet_placeBet_button')).click();
               await sleep(2000);
 
               statusDiv.innerText = t.stepConfirm;
-              (await waitForElement(`//button[starts-with(text(), "${t.confirmText}")]`, 'Confirm_Button')).click(); 
+              (await waitForElement(`//button[starts-with(text(), "${t.confirmText}")]`, 'Confirm_Button')).click();
               await sleep(2000);
             }
             await sleep(150);
           }
 
-          // 順利完成
-          statusDiv.style.color = '#28a745'; 
+          statusDiv.style.color = '#28a745';
           statusDiv.innerText = t.successDone;
           startBtn.style.display = 'none';
           resetBtn.style.display = 'block';
           fileInput.disabled = false;
-
         } catch (err) {
-          // 捕捉逾時或找不到元素的錯誤，切換顯示重置按鈕
           statusDiv.style.color = '#dc3545';
           statusDiv.innerText = err.message || t.errorInterrupt;
           startBtn.style.display = 'none';
@@ -191,5 +206,16 @@
     } catch (err) {}
   }
 
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", initHelper); else initHelper();
+  window.__toggleMarkSixHelper = function() {
+    const existing = document.getElementById('hkjc-helper-box-container');
+    if (!existing) {
+      createHelperBox();
+      return;
+    }
+    const isHidden = existing.style.display === 'none';
+    existing.style.display = isHidden ? 'block' : 'none';
+    if (isHidden) {
+      existing.style.opacity = '1';
+    }
+  };
 })();
