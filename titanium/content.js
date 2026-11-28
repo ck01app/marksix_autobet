@@ -83,7 +83,7 @@
       <button id="m-helper-close-btn" style="position:absolute;top:8px;right:10px;background:none;border:none;color:#dc3545;font-size:22px;font-weight:bold;cursor:pointer;padding:0 6px;line-height:1;z-index:10;">×</button>
       <h4 id="m-helper-title" style="margin:0 0 6px 0;color:#333;font-size:15px;font-weight:bold;padding-right:24px;user-select:none;">${t.title}</h4>
       <p style="font-size:12px;color:#666;margin:0 0 8px 0;user-select:none;">${t.subtitle}</p>
-      <input type="file" id="m-helper-file-input" accept=".csv,.txt,text/csv,text/plain,*/*" style="width:100%;margin-bottom:8px;font-size:13px;" />
+      <input type="file" id="m-helper-file-input" accept=".csv,.txt,text/csv,text/plain" style="width:100%;margin-bottom:8px;font-size:13px;" />
       <button id="m-helper-start-btn" disabled style="width:100%;padding:9px;background:#28a745;color:white;border:none;border-radius:4px;cursor:pointer;font-weight:bold;font-size:14px;margin-bottom:6px;">${t.startBtn}</button>
       <button id="m-helper-reset-btn" style="width:100%;padding:7px;background:#6c757d;color:white;border:none;border-radius:4px;cursor:pointer;font-weight:bold;font-size:12px;display:none;">${t.resetBtn}</button>
       <div id="m-helper-status" style="margin-top:8px;font-size:12px;font-weight:bold;color:#666;user-select:none;">${t.statusWaiting}</div>
@@ -112,6 +112,19 @@
         }
       }, 200);
     });
+
+    const findVisibleBall = (num) => {
+      const xp = `//div[contains(@class,"table-cell")]/div[contains(@class,"-ball") and normalize-space(text())="${num}"]`;
+      const snap = document.evaluate(xp, document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+      for (let idx = 0; idx < snap.snapshotLength; idx++) {
+        const el = snap.snapshotItem(idx);
+        const rect = el.getBoundingClientRect();
+        if (el.offsetParent !== null && rect.width > 0 && rect.height > 0) {
+          return el;
+        }
+      }
+      return null;
+    };
 
     // 觸控拖拽邏輯 (方便移動位置以免遮擋下方按鈕)
     let isDragging = false, offsetX = 0, offsetY = 0;
@@ -187,12 +200,18 @@
       try {
         for (let i = 0; i < parsedNumbers.length; i++) {
           const n = parsedNumbers[i];
-          const ballXpath = `//div[contains(@class,"table-cell")]/div[contains(@class,"-ball") and normalize-space(text())="${n}"]`;
           statusDiv.innerText = t.statusRunning(n, i + 1, parsedNumbers.length);
 
-          const ball = await waitForElement(ballXpath, `Ball_${n}`);
+          const ball = findVisibleBall(n);
+          if (!ball) {
+            throw new Error(t.errorTimeout(`Ball_${n}`));
+          }
+
           ball.scrollIntoView({ block: 'center', behavior: 'instant' });
+          await sleep(200);
+          console.log('[Titanium Helper] Clicking:', n, 'Element text:', ball.textContent.trim());
           ball.click();
+          await sleep(250);
 
           if (((i + 1) >= 60 && (i + 1) % 60 === 0) || (i + 1) === parsedNumbers.length) {
             statusDiv.innerText = t.stepAdd;
